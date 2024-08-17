@@ -49,7 +49,7 @@ __global__ void MoveBotPar(size_t * BotPar,  DEM::DynParticleCU * DPar, UdCu * U
     size_t ic = threadIdx.x + blockIdx.x * blockDim.x;
     if (ic>=UC[0].npbot) return;
     size_t ip = BotPar[ic];
-    real  vel = UC[0].Amp*M_PI/2.0*sin(demaux[0].Time*M_PI*2.0/UC[0].Tper);
+    real  vel = UC[0].Amp*M_PI*2.0/UC[0].Tper*sin(demaux[0].Time*M_PI*2.0/UC[0].Tper);
     DPar[ip].v.x  = vel;
     DPar[ip].xb.x = DPar[ip].x.x-vel*demaux[0].dt;
 }
@@ -60,26 +60,6 @@ void Setup (DEM::Domain & d2, void * UD) //function that is going to be called e
     MoveBotPar<<<dat.npbot/d2.Nthread+1,d2.Nthread>>>(dat.pBotPar,d2.pDynParticlesCU,dat.pUD,d2.pdemaux);
 }
 
-void Report (DEM::Domain & d2, void * UD)
-{
-    UserData & dat = (*static_cast<UserData *>(UD));
-    if (d2.idx_out==0)
-    {
-        String fs;
-        fs.Printf("%s_walls.res",d2.FileKey.CStr());
-        dat.oss_ss.open(fs.CStr());
-        dat.oss_ss << Util::_10_6 << "Time" << Util::_8s << "NumC" << std::endl;
-    }
-    if (!d2.Finished) 
-    {
-        size_t NumC= d2.pDynParticleCU.Size();   // Number of contact 
-        dat.oss_ss << Util::_10_6 << d2.Time  << Util::_8s << NumC << std::endl;
-    }
-    else
-    {
-        dat.oss_ss.close();
-    }
-}
 
 int main(int argc, char **argv) try
 {
@@ -178,16 +158,15 @@ int main(int argc, char **argv) try
     double ang=Ang*M_PI/180.0;
     cout <<"acc"<< acc<<endl;
     cout <<"L_z"<< L_z<<endl;
-    double Sphere_size;
+
     double dtdem;
     Vec3_t Xmin0;
     Vec3_t Xmax0;
     Vec3_t Center;
-    double R_base=9.2;
     Array<int> delpar0;
     Vec3_t axis0(OrthoSys::e0); // rotation of face
     Vec3_t axis1(OrthoSys::e1); // rotation of face
-    double thichness=4*R;
+    double thichness=0.1;
     
 
 
@@ -195,17 +174,16 @@ int main(int argc, char **argv) try
     UdCu UC;
     UserData dat;
     d2.UserData = &dat;
-    
     Center = Vec3_t(0.0,0.0,0.0);
     
-    d2.AddPlane (-17, Vec3_t(Center(0)-L_x/2.0,Center(1),Center(2)), R, L_z, L_y, 1.0, ang, &axis1);
-    d2.AddPlane (-18, Vec3_t(Center(0)+L_x/2.0,Center(1),Center(2)), R, L_z, L_y, 1.0, ang, &axis1);
-    d2.AddPlane (-19, Vec3_t(Center(0),Center(1)-L_y/2.0,Center(2)), R, L_x, L_z, 1.0, M_PI/2.0, &axis0);
-    d2.AddPlane (-20, Vec3_t(Center(0),Center(1)+L_y/2.0,Center(2)), R, L_x, L_z, 1.0, M_PI/2.0, &axis0);
-    d2.AddPlane (-15, Vec3_t(Center(0),Center(1),Center(2)-L_z/2.0), R, L_z, L_y, 1.0, 0.0, &axis1);
-    d2.AddPlane (-16, Vec3_t(Center(0),Center(1),Center(2)+L_z/2.0), R, L_z, L_y, 1.0, 0.0, &axis1);
+    d2.AddPlane (-17, Vec3_t(Center(0)-L_x/2.0,Center(1),Center(2)), thichness, L_z, L_y, 1.0, ang, &axis1);
+    d2.AddPlane (-18, Vec3_t(Center(0)+L_x/2.0,Center(1),Center(2)), thichness, L_z, L_y, 1.0, ang, &axis1);
+    d2.AddPlane (-19, Vec3_t(Center(0),Center(1)-L_y/2.0,Center(2)), thichness, L_x, L_z, 1.0, M_PI/2.0, &axis0);
+    d2.AddPlane (-20, Vec3_t(Center(0),Center(1)+L_y/2.0,Center(2)), thichness, L_x, L_z, 1.0, M_PI/2.0, &axis0);
+    d2.AddPlane (-15, Vec3_t(Center(0),Center(1),Center(2)-L_z/2.0), thichness, L_x, L_y, 1.0, 0.0, &axis1);
+    d2.AddPlane (-16, Vec3_t(Center(0),Center(1),Center(2)+L_z/2.0), thichness, L_x, L_y, 1.0, 0.0, &axis1);
     Xmin0=Vec3_t(Center(0)-L_x/2.0, Center(1)-L_y/2.0  , Center(2)-L_z/2.0);
-    Xmax0=Vec3_t(Center(0)+L_x/2.0, Center(1)+L_y/2.0  , Center(2)+L_z/2.0);
+    Xmax0=Vec3_t(Center(0)+L_x/2.0, Center(1)+L_y/2.0 , Center(2)+L_z/2.0);
     d2.GenSpheresBox (-1, Xmin0, Xmax0, R, rho_s, "Normal",  1234, fraction, sizedis);
 
     d2.GetParticle(-17)->FixVeloc(); 
@@ -227,13 +205,17 @@ int main(int argc, char **argv) try
         if (d2.Particles[np]->Tag ==-1&&count>Nump)
         {
             d2.Particles[np]->Tag = 10;
+           
         }
     }
     Array<int> delpar1;
     delpar1.Push(10);
-    if (delpar1.Size()>0) d2.DelParticles(delpar1);
-
-
+    if (delpar1.Size()>0&Nump<75) 
+    {
+        d2.DelParticles(delpar1);
+        
+    }
+    cout <<"T"<< Tper<<endl;
     thrust::host_vector<size_t> hBotPar;
     for (size_t np=0;np<d2.Particles.Size();np++)
     {
@@ -275,7 +257,7 @@ int main(int argc, char **argv) try
 
     dtdem = ratiots*d2.CriticalDt(); //Calculating time step
     d2.Alpha = R/4.0; //Verlet distance
-    d2.Solve(/*tf*/Tf2, dtdem, /*dtOut*/dtOut2, Setup, Report, "shake", 2, Nproc);
+    d2.Solve(/*tf*/Tf2, dtdem, /*dtOut*/dtOut2, Setup, NULL, "shake", 2, Nproc);
     d2.Save("Stage_P2");
     
 

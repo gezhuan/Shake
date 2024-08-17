@@ -68,7 +68,8 @@ void Setup (DEM::Domain & d2, void * UD)
     UserData & dat = (*static_cast<UserData *>(UD));
     //double vel = 0.5*dat.str*std::min(10.0*(dom.Time-dat.T0)/(dat.Tf-dat.T0),1.0);
 
-    double vmod=dat.Amp*M_PI/2.0*sin(d2.Time*M_PI*2.0/dat.Tper);
+    double vmod=dat.Amp*M_PI*2.0*cos(d2.Time*M_PI*2.0/dat.Tper)/dat.Tper;
+    //cout <<"v"<< vmod<<endl;
     d2.GetParticle(-15)->v=Vec3_t(vmod,0.0,0.0);
     d2.GetParticle(-15)->InitializeVelocity(dat.dt);
     d2.GetParticle(-16)->v=Vec3_t(vmod,0.0,0.0);
@@ -190,7 +191,7 @@ int main(int argc, char **argv) try
     Array<int> delpar0;
     Vec3_t axis0(OrthoSys::e0); // rotation of face
     Vec3_t axis1(OrthoSys::e1); // rotation of face
-    double thichness=4*R;
+    double thichness=0.1;
     
 
 
@@ -202,15 +203,15 @@ int main(int argc, char **argv) try
     dat.Tper=Tper;
     Center = Vec3_t(0.0,0.0,0.0);
     
-    d2.AddPlane (-17, Vec3_t(Center(0)-L_x/2.0,Center(1),Center(2)), R, L_z, L_y, 1.0, ang, &axis1);
-    d2.AddPlane (-18, Vec3_t(Center(0)+L_x/2.0,Center(1),Center(2)), R, L_z, L_y, 1.0, ang, &axis1);
-    d2.AddPlane (-19, Vec3_t(Center(0),Center(1)-L_y/2.0,Center(2)), R, L_x, L_z, 1.0, M_PI/2.0, &axis0);
-    d2.AddPlane (-20, Vec3_t(Center(0),Center(1)+L_y/2.0,Center(2)), R, L_x, L_z, 1.0, M_PI/2.0, &axis0);
-    d2.AddPlane (-15, Vec3_t(Center(0),Center(1),Center(2)-L_z/2.0), R, L_z, L_y, 1.0, 0.0, &axis1);
-    d2.AddPlane (-16, Vec3_t(Center(0),Center(1),Center(2)+L_z/2.0), R, L_z, L_y, 1.0, 0.0, &axis1);
-    Xmin0=Vec3_t(Center(0)-L_x/2.0+2.0*R, Center(1)-L_y/2.0 +2.0*R , Center(2)-L_z/2.0+2.0*R);
-    Xmax0=Vec3_t(Center(0)+L_x/2.0-2.0*R, Center(1)+L_y/2.0 -2.0*R , Center(2)+L_z/2.0-2.0*R);
-    d2.GenSpheresBox (-1, Xmin0, Xmax0, R, rho_s, "HCP",  1234, fraction, sizedis);
+    d2.AddPlane (-17, Vec3_t(Center(0)-L_x/2.0,Center(1),Center(2)), thichness, L_z, L_y, 1.0, ang, &axis1);
+    d2.AddPlane (-18, Vec3_t(Center(0)+L_x/2.0,Center(1),Center(2)), thichness, L_z, L_y, 1.0, ang, &axis1);
+    d2.AddPlane (-19, Vec3_t(Center(0),Center(1)-L_y/2.0,Center(2)), thichness, L_x, L_z, 1.0, M_PI/2.0, &axis0);
+    d2.AddPlane (-20, Vec3_t(Center(0),Center(1)+L_y/2.0,Center(2)), thichness, L_x, L_z, 1.0, M_PI/2.0, &axis0);
+    d2.AddPlane (-15, Vec3_t(Center(0),Center(1),Center(2)-L_z/2.0), thichness, L_x, L_y, 1.0, 0.0, &axis1);
+    d2.AddPlane (-16, Vec3_t(Center(0),Center(1),Center(2)+L_z/2.0), thichness, L_x, L_y, 1.0, 0.0, &axis1);
+    Xmin0=Vec3_t(Center(0)-L_x/2.0, Center(1)-L_y/2.0  , Center(2)-L_z/2.0);
+    Xmax0=Vec3_t(Center(0)+L_x/2.0, Center(1)+L_y/2.0 , Center(2)+L_z/2.0);
+    d2.GenSpheresBox (-1, Xmin0, Xmax0, R, rho_s, "Normal",  1234, fraction, sizedis);
 
     d2.GetParticle(-17)->FixVeloc(); 
     d2.GetParticle(-18)->FixVeloc(); 
@@ -231,11 +232,17 @@ int main(int argc, char **argv) try
         if (d2.Particles[np]->Tag ==-1&&count>Nump)
         {
             d2.Particles[np]->Tag = 10;
+           
         }
     }
     Array<int> delpar1;
     delpar1.Push(10);
-    if (delpar1.Size()>0) d2.DelParticles(delpar1);
+    if (delpar1.Size()>0&Nump<75) 
+    {
+        d2.DelParticles(delpar1);
+        
+    }
+    cout <<"T"<< Tper<<endl;
     for (size_t np=0;np<d2.Particles.Size();np++)
     {
         if (d2.Particles[np]->Tag == -1)
@@ -250,17 +257,18 @@ int main(int argc, char **argv) try
 
         if (d2.Particles[np]->Tag <= -15)
         {
-            d2.Particles[np]->v=Vec3_t(Amp,0.0,0.0);
+            //d2.Particles[np]->v=Vec3_t(Amp,0.0,0.0);
             d2.Particles[np]->Props.Kn = Kn; // normal stiffness
             d2.Particles[np]->Props.Kt = Kt; // trangential stiffness
             d2.Particles[np]->Props.Gn = Gn; // restitution coefficient
             d2.Particles[np]->Props.Mu = Muw; // frictional coefficient
         }
     }
+    cout <<"Amp"<< Amp<<endl;
 
     dtdem = ratiots*d2.CriticalDt(); //Calculating time step
     dat.dt=dtdem;
-    d2.Alpha = R/4.0; //Verlet distance
+    d2.Alpha = R/2.0; //Verlet distance
     d2.Solve(/*tf*/Tf2, dtdem, /*dtOut*/dtOut2, Setup, Report, "shakecpu", 2, Nproc);
     d2.Save("Stage_cpu");
 
